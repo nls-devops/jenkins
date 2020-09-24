@@ -1,0 +1,11 @@
+---
+- name: list all namespaces
+  hosts: kubernetes
+  become: true
+  user: root
+
+  tasks:
+  - name: Get a list of all pods from any namespace
+    k8s_info:
+      kind: Pod
+    register: pod_list

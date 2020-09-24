@@ -1,0 +1,144 @@
+= Module 4, Integrating Ansible
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+:keywords: DevOps, Jenkins, Automation, CI, CD
+
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+== Task 1, Check ONTAP Cluster information Using Ansible
+1. Log in *rhel5*
+
+2. Go inside *Jenkins Container*
++
+----
+docker exec -it jenkins bash
+----
+
+3. Create a folder named *ansible*
++
+----
+mkdir /root/ansible
+cd /root/ansible
+----
+
+4. download *playbook*, *ansible.cfg* and *hosts*
++
+----
+wget https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/files/module4/get_cluster_details.yml
+----
++
+----
+wget https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/files/module4/ansible.cfg
+----
++
+----
+wget https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/files/module4/hosts
+----
+
+5. Check the *Ansible Inventory*, *configuration* and *get_cluster_details.yml*
++
+----
+cat hosts
+
+cat ansible.cfg
+
+cat get_cluster_details.yml
+----
+
+6. Test Ansible
++
+----
+ansible -m ping dockers
+----
++
+NOTE: if ask "Are you sure you want to continue connecting (yes/no)?"
+*Enter yes*
++
+----
+ansible -m ping kubernetes
+----
+
+7. Check the Cluster information
++
+----
+ansible-playbook get_cluster_details.yml -v
+----
+
+== Task 2, Create a Jenkins Task to Check the Cluster information
+1. Create a new Jenkins Task, named *check_cluster_info_use_bash*
++
+----
+Item name: check_cluster_info_use_bash
+Project Style: Freestyle Project
+Build: Execute shell
+Command: ‌‌‌‌‌‌‌‌ansible-playbook /root/ansible/get_cluster_details.yml -i /root/ansible/hosts
+----
+
+2. *Save* and *Build Now*
+
+3. Click the *Build id* and *Console Output*
+
+4. Install ansible plugin
++
+image::4_2_1.png[]
+
+5. We are going to use the *Jenkins ansible plugin* to create the same task as steps 1-4.
+Create a new Jenkins Task named *check_cluser_info_use_ansible_plugin*
++
+----
+Item name: check_cluser_info_use_ansible_plugin
+Project Style: Freestyle Project
+Build: Invoke Ansible Playbook
+Playbook path: /root/ansible/get_cluster_details.yml
+----
++
+image::4_2_2.png[]
+
+6. *Save*, *Build Now*, *Build ID* and  *Console Output*
+
+== Task 3, Use Ansible Playbook to create SVM, Volume and CIFS share
+
+1. Use below links as reference to create a *playbook*
+https://github.com/AdrianBronder/ntap-automation/blob/master/ontap9/ansible/21_create_pri_svm.yml[create_pri_svm.yml]
+https://github.com/AdrianBronder/ntap-automation/blob/master/ontap9/ansible/20_create_pri_svm_all.yml[create_pri_svm_all.yml]
+https://github.com/AdrianBronder/ntap-automation/blob/master/ontap9/ansible/31_create_cifsvol_pri_svm.yml[create_cifsvol_pri_svm.yml]
+https://github.com/AdrianBronder/ntap-automation/blob/master/ontap9/ansible/33_create_cifsshare_pri_svm.yml[create_cifsshare_pri_svm.yml]
+https://github.com/HaopengL/Automation_DevOps_Using_Jenkins/blob/master/files/module4/get_cluster_details.yml[get_cluster_details.yml]
+
++
+====
+.Requirements:
+Use the playbook to create
+[horizontal]
+SVM name:: vserver_jenkins
+Aggregate:: use aggr1 (already exist, doesn't need to crate)
+vol size:: 10G
+SVM mgmt lif:: 192.168.0.200
+SVM data lif:: 192.168.0.201
+CIFS share name:: jenkins
+domain:: demo.netapp.com
+domain admin:: administrator@demo.netapp.com
+====
+
+2. Run the playbook from Jenkins
+
+3. On the Jumphost, map Z: driver to the CIFS share just created
++
+----
+net uze * \\192.168.0.201\jenkins
+----
+Copy a file to Z driver to make sure you have the write permission
+We will use this CIFS share later
+
+WARNING: The workable ansible playbook you can download from here
+https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/files/module4/create_svm_vol_cifs.yml[create_svm_vol_cifs.yml]
+https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/files/module4/global.vars[gloabal.vars]

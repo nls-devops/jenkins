@@ -1,0 +1,25 @@
+pipeline {
+	agent any
+
+	stages{
+        stage('download_bing_img'){
+            steps{
+                echo '***** download image from bing *****'
+                sh 'python3 /var/jenkins_home/pipeline/bingImage.py'
+            }
+        }
+
+		stage('copy_to_cifs_share'){
+            steps{
+                echo '***** copy to windows cifs sahre *****'
+                script {
+                    cifsPublisher(publishers: [[configName: 'jenkins', 
+                                transfers: [[removePrefix: 'images/', sourceFiles: 'images/*.*']]
+                                ]])
+                sh 'rm /var/jenkins_home/workspace/$JOB_NAME/images/* -rf'
+                }
+            }
+
+		}
+	}
+}

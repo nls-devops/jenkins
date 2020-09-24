@@ -1,0 +1,365 @@
+= Module 6, Integrating with Kubernetes
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+:keywords: DevOps, Jenkins, Automation, CI, CD
+
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+== Task 1, Run *kubectl* from Jenkins on Remote Kubernetes Master
+We are going to run kubernetes command *kubectl* on remote kubernetes master *rhel3*.
+
+1. Make sure *SSH plugin* is installed. If not, install it.
+
+2. Add remote Kubernetes Master's Credentials
++
+*Jnekins* => *Manage Jenkins* => *Manage Credentials* => click *Jenkins* => Click *Global credentials* => *Add Credentials*
++
+----
+Kind: Username with Password
+Username: root
+Password: Netapp1!
+----
++
+Click *OK*
++
+image::6_1_1.png[]
+
+3. Go to *Jnekins* => *Manage Jenkins* => *Configure System* => *SSH remote hosts* => *Add*
++
+----
+Hostnmae: rhel3
+Port: 22
+Credentials => root (created in step 2)
+----
++
+click *Check connection*, make sure *Successfull connection*
++
+Click *Save* at the bottom
+
+4. Create a new Jenkins Task
++
+----
+Item name: run_kubectl_use_bash
+Project Type: Freestyle project
+Build: Execute shell script on remote host using ssh
+SSH site: root@rhel3:22
+Command: kubectl get all --all-namespaces
+----
+
+5. Check the build status
++
+*Save* => *Build Now* => *Build ID* => *Console Output*
+
+== Task 2, Use *Ansible Plugin* to Run Kubernetes Task
+We are going to use Ansible Plugin to run task on the Kubernetes
+There are two options
+a. Use ansible playbook to run bash command *kubectl* ...
+b. Use anisble k8s module
+
+1. Download the ansible playbook using bash Command to Jenkins container directory */var/jenkins_home/ansible*
++
+----
+Go inside of Jenkins container on *rhel5*
+
+mkdir /var/jenkins_home/ansible
+
+cd /var/jenkins_home/ansible
+
+wget https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/files/module6/ansible_bash_playbook.yml
+----
++
+Check the contents, notice that it uses
++
+[source,yaml]
+----
+command: kubectl get all --all-namespaces
+----
+
+
+2.  Create a new Jenkins task
++
+----
+Item name: run_ansible_use_bash
+Project type: Freestyle Project
+Build: Invoke Ansible Playbook
+Playbook path: /var/jenkins_home/ansible/ansible_bash_playbook.yml
+inline content:
+            [kubernetes]
+            rhel3
+----
++
+image::6_2_1.png[]
+
+3. *Save* => *Build Now* => *Build ID* => *Console Output*
+
+4. Download another ansible playbook using k8s module
++
+----
+wget https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/files/module6/ansible_k8s_playbook.yml
+----
++
+Check the contents, notice that it uses
++
+[source,yaml]
+----
+tasks:
+- name: Get a list of all pods from any namespace
+  k8s_info:
+    kind: Pod
+  register: pod_list
+----
+
+5. Create another Jenkins task
++
+----
+Item name: run_ansible_use_k8s
+Project type: Freestyle Project
+Build: Invoke Ansible Playbook
+Playbook path: /var/jenkins_home/ansible/ansible_k8s_playbook.yml
+inline content:
+            [kubernetes]
+            rhel3
+----
+
+6. Install Ansible Kubernetes modules
++
+Go inside Jenkins container
++
+----
+ansible-galaxy collection install community.kubernetes
+----
++
+NOTE: You can create a new docker image which include this command.
+
+7. Install *openshift* on kubernetes master, *rhel3*
++
+ansible kubernetes modules need talsk to openshift API on kubernetes master
++
+Use ssh to log in *rhel3*
++
+----
+# To enable the IUS repository 
+yum install -y \
+https://repo.ius.io/ius-release-el7.rpm \
+https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+
+# Install Python 3:
+yum install python36 -y
+
+# Validate pip3 installation:
+python3.6 -m ensurepip
+
+# Install & Upgrade pip3
+python36 -m pip install --upgrade pip
+
+
+#  Successfully installed pip-10.0.1 setuptools-39.0.1
+# Clear commands cache
+hash -r
+# might be required if getting in bash: /usr/bin/pip3: No such file or directory)
+su
+pip3 -V
+# pip 19.0.3 from /usr/local/lib/python3.6/site-packages/pip (python 3.6)
+which pip3
+# /usr/local/bin/pip3
+
+# The default python is python2.7, we need use python3.6
+# remove default symbolic link of python
+rm /usr/bin/python -f
+# Create a new symbolic link which points to python3.6
+ln -s /usr/bin/python3.6 /usr/bin/python
+
+# Install openshift
+pip3 insall openshift
+----
+
+8. Go back to Jenkins, *Build Now* and check the *Console Output*
+
+== Task 3, Deploy a Local Load Balancer on kubernetes
+
+We are going to deploy MetalLB hooks into the Kubernetes cluster, and provides a network load-balancer implementation. In short, it allows you to create Kubernetes services of type “LoadBalancer” in clusters that don’t run on a cloud provider, and thus cannot simply hook into paid products to provide load-balancers.
+
+====
+Reference: https://metallb.universe.tf/installation/
+====
+
+1. Use ssh to lgoin *rhel3*
+
+2. Prepare
++
+----
+# see what changes would be made, returns nonzero returncode if different
+kubectl get configmap kube-proxy -n kube-system -o yaml | \
+sed -e "s/strictARP: false/strictARP: true/" | \
+kubectl diff -f - -n kube-system
+
+# actually apply the changes, returns nonzero returncode on errors only
+kubectl get configmap kube-proxy -n kube-system -o yaml | \
+sed -e "s/strictARP: false/strictARP: true/" | \
+kubectl apply -f - -n kube-system
+----
+
+3. Installation By Manifest
++
+----
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.9.3/manifests/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.9.3/manifests/metallb.yaml
+# On first install only
+kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"
+----
+
+4. Check the Installation
++
+----
+# kubectl get all -n metallb-system
+NAME                              READY   STATUS    RESTARTS   AGE
+pod/controller-7686dfc96b-qctnv   1/1     Running   0          47s
+pod/speaker-8wmm4                 1/1     Running   0          47s
+pod/speaker-q78td                 1/1     Running   0          47s
+pod/speaker-s9tx7                 1/1     Running   0          47s
+
+NAME                     DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR                 AGE
+daemonset.apps/speaker   3         3         3       3            3           beta.kubernetes.io/os=linux   47s
+
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/controller   1/1     1            1           47s
+
+NAME                                    DESIRED   CURRENT   READY   AGE
+replicaset.apps/controller-7686dfc96b   1         1         1       47s
+----
+
+5. Configure MetalLB control over IPs
++
+----
+wget https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/files/module6/metallb_ip_configmap.yml
+
+kubectl create -f metallb_ip_configmap.yml
+----
++
+====
+you can open the https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/files/module6/metallb_ip_configmap.yml[IP Configmap] file to check the details
+We are going to use the IP range from 192.168.0.80 to 192.168.0.90 as external IPs.
+====
+
+== Task 4, Deploy LVT to Kubernetes
+Remember we used *docker run* to deploy a *LVT* container in module 3. Right now, we are going to deploy it in the *Kubernetes Cluster*.
+
+1. Go to Jenkins to create new task
++
+----
+Item name: deploy_lvt_on_kubernetes
+Type: Freestyle
+Build: Execute shell script on remote host using ssh
+SSH site: root@rhel3:22
+
+Command:
+         kubectl create deployment --image=jerry2605/lvt lvt
+         kubectl expose deployment lvt --port 80 --type LoadBalancer
+----
+
+2.  *Save* => *Build Now* => *Build ID* => *Console Output*
+
+3. login *rhel3*
++
+----
+kubectl get service -o wide
+----
+image::6_4_1.png[]
++
+get the IP from the output, for example 192.168.0.80
+
+4. Open a browser to open the IP you found in last step
+
+5. Delete the service and deployment
++
+----
+kubectl delete service lvt
+kubectl delete deployment lvt
+----
+
+== Task 5, Deploy a New Jenkins Container in Kubernetes Cluster
+Remember in Module 3, we used the command
+----
+docker run -d --name jenkins -p 8080:8080 -u root --restart=always \
+       -v ~/jenkins_home:/var/jenkins_home \
+       -v /var/run/docker.sock:/var/run/docker.sock \
+       -v /root/.ssh:/root/.ssh registry.demo.netapp.com/jenkins
+----
+to deploy the Jenkins container. The folder ~/jenkins_home is for Jenkins configuration and data.
+
+In the kubernetes cluster, we need use *Persistent Volume*. Since NetApp has Kubernetes plugin *Trident*. We are going to use this Plugin to automatically create PV.
+
+For *PV*, *PVC* and *Trident*, please attend another course *Introduction to Kubernetes Administration*
+
+1. The *Trident* has already been installed. *Backend* and *Storage Class* has already been setup.
++
+----
+# Check the pods that created for trident
+kubectl get pod -n trident
+
+# Check the trident version
+tridentctl -n trident version
+
+# Check the backend
+tridentctl -n trident get backend
+
+# Check the storage class
+kubectl get sc
+----
+
+2. Create a Persistent Volume Claim
++
+----
+kubectl create -f /root/trident-installer/setup/pvcfornas.yaml
+----
++
+check
++
+----
+kubectl get pvc
+
+kubectl get pv
+----
++
+write down the pvc name, we will use it in the yaml file to create Jenkins deployment
++
+image::6_5_1.png[]
+
+3. Create a yaml file to deploy Jenkins in the kubernetes cluster
++
+Here is a workable template, use it unless you can't create by yourself.
++
+https://github.com/HaopengL/Automation_DevOps_Using_Jenkins/blob/master/files/module6/jenkins_deployment.yml[jenkins_deployment.yml]
+
+4. Deploy the template and export the deployment as service
++
+----
+kubectl create -f jenkins_deployment.yml
+
+kubectl expose deployment jenkins --port 8080 --type LoadBalancer
+----
+
+5. Find the *EXTERNAL-IP*  of the service just created
+
++
+----
+kubectl get service -o wide
+----
+
+6. Use web browser to open the *EXTERNAL-IP:8080*
++
+You will need to reinitialize
+
+
+== Optional Task, Deploying and Scaling Jenkins on Kubernetes
+
+Follow this link https://rancher.com/blog/2018/2018-11-27-scaling-jenkins/[scalling-jenkins] as reference.

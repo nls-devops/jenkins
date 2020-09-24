@@ -1,0 +1,239 @@
+= Module 0, Checking Lab Equipment
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+:keywords: DevOps, Jenkins, Automation, CI, CD
+
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+
+
+#### STUDY AID ICONS
+In your exercises, you might see one or more of the following icons.
+
+WARNING: If you misconfigure a step marked with this icon, later steps might not work properly. Check the step carefully before you move forward.
+
+IMPORTANT: Review this step or comment carefully to save time, learn a best practice, or avoid errors.
+
+//CAUTION: Caution level message
+
+NOTE: A comment labeled with this icon provides information about the topic or procedure.
+
+TIP: A comment labeled with this icon identifies reference material that provides additional information.
+
+
+#### CHECKING THE LAB EQUIPMENT
+In this exercise, you familiarize yourself with your equipment and ensure that the credentials provided by the instructor are operational.
+
+#### OBJECTIVES
+This exercise focuses on enabling you to do the following::
+*	 Ensure access to your jump host
+*  Ensure connectivity to an ONTAP cluster
+*	 Ensure connectivity to the Element Cluster
+*	 Test the access to the Linux VMs and verify that all tools are running properly
+
+
+#### GITHUB CONTAINING ALL THE FILES AND TEMPLATES
+You can download or clone the Github public repository containing the necessary files
+https://github.com/HaopengL/Automation_DevOps_Using_Jenkins
+
+#### EXERCISE EQUIPMENT DIAGRAM
+image::0_1.png[]
+
+image::0_2.png[]
+
+image::0_3.png[]
+
+## Task 1, Ensure Connectivity to your ONTAP
+1. Open a browser and visit the following Website:
+https://lod-bootcamp.netapp.com
++
+NOTE: If you provision the lab by yourself, please use this lab
++
+----
+Using Trident with Kubernetes and ONTAP v3.1
+https://labondemand.netapp.com/lod3/request?catid=SL10556
+----
+
+2. At the login prompt, enter the credentials provided to you by your instructor:
++
+Login ID: bXXXXu[YOUR KIT]
+Password: ask the instructor
++
+image::0_4.png[]
+
+3. Select the Lab called *Using Trident with Kubernetes and ONTAP* and connect to it.
+
+4. Once you see the Windows Desktop (your jump host), verify that you have a file called *Stateful Cmds.txt* on the Desktop.
+
+5. Make sure your keyboard is set to the correct layout.
+
+6. Open the C:/LOD folder and make sure you see the config folder:
++
+image::0_5.png[]
+
+7. On the menu bar, click the Putty icon and verify that you can see 6 RHEL hosts
++
+image::0_6.png[]
+
+8. In Putty, double click the “cluster1” session and login to the ONTAP cluster:
++
+Username: admin
+Password: Netapp1!
+
+9. Enter the command “date” and verify that the time is synchronized.
+
+10. Open a web browser and navigate to cluster1.demo.netapp.com.
+
+11. Login using the credentials in step 1-8 and navigate your cluster:
++
+image::0_7.png[]
+
+
+## Task 2: Verify That Required Software and Tools Are installed
+
+The RHEL hosts must have several tools running, including Docker and Kubernetes.
+
+1. Open the Putty Client and double click on the *rhel5* session:
++
+image::0_8.png[]
+
+2. Login using the credentials:
++
+Username: root
+Password: Netapp1!
+
+3. Run the following command to verify that the docker daemon is running:
++
+----
+ps -aef | grep dockerd
+----
+
+4. Verify if containers are running:
++
+----
+docker ps
+----
+
+5. Verify the connection to the public Docker repositories:
++
+----
+docker search netapp
+----
+
+6. Run a Docker container and destroy it:
++
+----
+docker run -it debian
+ls -al
+exit
+docker ps
+docker ps -a (to list stopped containers)
+docker rm $(docker ps -a -q) (to delete ALL stopped containers)
+----
+
+7. Verify that the docker0 interface is configured on the host:
++
+----
+ifconfig docker0
+----
+
+8. Optionally, create an alias for the docker command (makes recurrent commands faster):
++
+----
+alias d=’docker’
+----
+
+9. Close the putty session and open a new one on *rhel3* (master node of the Kubernetes cluster):
++
+image::0_9.png[]
+
+10. Login using the credentials:
++
+Username: root
+Password: Netapp1!
+
+11. Verify that the Kubernetes services are running:
++
+----
+ps -aux | grep kubernetes
+----
+
+12. Optionally, create an alias for the most utilized Kubernetes command:
++
+----
+alias k=’kubectl’
+----
+NOTE: If you use the alias, you can replace all the upcoming “kubectl” commands with “k”.
+
+13. Verify the version of Kubernetes:
++
+----
+k version
+----
+
+14. Verify the node type you connected to:
++
+----
+k cluster-info
+----
+
+15. Verify that the Kubernetes cluster is showing you the 3 nodes:
++
+----
+k get nodes
+----
++
+Use the -o option to change the output (this option can be used in many commands):
++
+----
+k get nodes -o wide
+k get nodes -o json
+----
+
+16. Label the worker nodes (with the role set to “none”) with a recognizable tag:
++
+----
+k label node rhel1 node-role.kubernetes.io/worker=
+k label node rhel2 node-role.kubernetes.io/worker=
+----
+
+17. Verify that the Kubernetes nodes are showing the right labels:
++
+----
+k get nodes
+----
+
+18. Open the Kubernetes Configuration Files:
++
+----
+cat $HOME/.kube/config
+----
+
+19. View the Kubernetes Configuration:
++
+----
+k config view
+----
+
+20. Navigate to the root user’s directory:
++
+----
+cd /root
+----
+
+21. Clone the contents of the *Automation DevOps Using Jenkins* git repository and browse the new folder:
++
+----
+git clone https://github.com/HaopengL/Automation_DevOps_Using_Jenkins
+cd Automation_DevOps_Using_Jenkins
+ls -al
+----

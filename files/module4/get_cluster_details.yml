@@ -1,0 +1,67 @@
+---
+- hosts: localhost
+  gather_facts: false
+  vars:
+    input: &input
+      hostname:       "192.168.0.101"
+      username:       "admin"
+      password:       "Netapp1!"
+      https:          true
+      validate_certs: false
+      use_rest:       "Always"
+  #vars_files:
+  #  - ../global.vars
+  collections:
+    - netapp.ontap
+
+  tasks:
+  - name: Get Ontap Info
+    na_ontap_info:
+      state: info
+      gather_subset:
+        - cluster_identity_info
+        - net_interface_info
+        - cluster_image_info
+        - cluster_node_info
+        - aggregate_info
+        - net_port_info
+      <<: *input
+    register: netapp
+
+  - name: Print cluster details
+    debug:
+      msg:
+        - "Name:      {{ netapp.ontap_info.cluster_identity_info.keys() | list | first }}"
+        - "IP:        {{ netapp.ontap_info.net_interface_info.cluster_mgmt.address }}"
+        - "Version:   {{ netapp.ontap_info.cluster_image_info.keys() | list | first }}"
+
+  - name: Print node details
+    debug:
+      msg:
+        - "Name:      {{ netapp.ontap_info.cluster_node_info[item].node_name }}"
+    with_items:
+      "{{ netapp.ontap_info.cluster_node_info }}"
+
+  - name: Print aggregate details
+    debug:
+      msg:
+        - "Name:      {{ netapp.ontap_info.aggregate_info[item].aggregate_name }}"
+        - "Node:      {{ netapp.ontap_info.aggregate_info[item].nodes.node_name }}"
+        - "Size:      {{ netapp.ontap_info.aggregate_info[item].aggr_space_attributes.size_total }}"
+        - "Used:      {{ netapp.ontap_info.aggregate_info[item].aggr_space_attributes.size_used }}"
+    with_items:
+      "{{ netapp.ontap_info.aggregate_info }}"
+    when:
+      netapp.ontap_info.aggregate_info[item].aggr_raid_attributes.is_root_aggregate == "false"
+
+  - name: Print port details
+    debug:
+      msg:
+        - "Name:      {{ netapp.ontap_info.net_port_info[item].port }}"
+        - "Node:      {{ netapp.ontap_info.net_port_info[item].node }}"
+        - "Speed:     {{ netapp.ontap_info.net_port_info[item].operational_speed }}"
+        - "MTU:       {{ netapp.ontap_info.net_port_info[item].mtu }}"
+        - "State:     {{ netapp.ontap_info.net_port_info[item].link_status }}"
+        - "BC Domain: {{ netapp.ontap_info.net_port_info[item].broadcast_domain }}"
+    with_items:
+      "{{ netapp.ontap_info.net_port_info }}"

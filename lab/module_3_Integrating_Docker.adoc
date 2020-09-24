@@ -1,0 +1,177 @@
+= Module 3, Integrating Docker
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+:keywords: DevOps, Jenkins, Automation, CI, CD
+
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+== Task 1, Build a Customized Jenkins image
+1. SSH to *rhel5*
+
+2. create a Dockerfile
+requirements::
+* build from jenkins/jenkins:lts-alpine
+* install docker
+* install python3
+* install ansible
+* install ansible ontap Module
+
+3. Check below links as reference
++
+https://github.com/HaopengL/Automation_DevOps_Using_Ansible/blob/master/files/module3/Dockerfile[Dockerfile]
++
+----
+wget https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Ansible/master/files/module3/Dockerfile
+----
+4. Build the Customized Jenkins image and set the tag as *registry.demo.netapp.com/jenkins*
++
+====
+registry.demo.netapp.com is a local repository server
+====
+-f:: Specify a Dockerfile
+-t:: Tag an image
++
+WARNING: don't forget [red]*.* at last, the build will take several minutes
++
+----
+docker build -f Dockerfile -t registry.demo.netapp.com/jenkins .
+----
+
+
+5. Push to server *registry.demo.netapp.com* which runs on *rhel4*
++
+----
+docker push registry.demo.netapp.com/jenkins
+----
+
+6. Check the image has been push to *rhel4*
++
+-----
+curl -X GET http://rhel4/v2/_catalog
+-----
++
+output:: {"repositories":["jenkins","my_custom_httpd"]}
+
+7. Stop and delete the Jenkins container we created in module 2.
++
+----
+docker stop jenkins
+docker rm jenkins
+----
+
+8. Delete local contianer we just built
++
+----
+docker image rm registry.demo.netapp.com/jenkins
+----
+
+9. Confirm the image has been deleted
++
+----
+docker image ls
+----
+
+== Task 2, Deploy a New Jenkins container
+1. On *rhel5*, run follow command
++
+----
+docker run -d --name jenkins -p 8080:8080 -u root --restart=always \
+       -v ~/jenkins_home:/var/jenkins_home \
+       -v /var/run/docker.sock:/var/run/docker.sock \
+       -v /root/.ssh:/root/.ssh registry.demo.netapp.com/jenkins
+----
++
+====
+-v ~/jenkins_home:/var/jenkins_home:: Jenkins configuration and data folder
+-v /var/run/docker.sock:/var/run/docker.sock:: the host and the container share the same Docker Daemon
+-v /root/.ssh:/root/.ssh:: the host and the container share the same ssh key
+====
+2. Check the container is running
++
+----
+docker ps
+----
+
+3. Go inside the Container
++
+----
+docker exec -it jenkins bash
+----
+
+4. Check *python*, *ansible* and *docker* versions
++
+----
+python --version
+ansible --version
+docker --version
+----
+
+5. Jenkins Container and host *rhel5* share the same Docker Daemon
+Compare the output of *docker ps* and *docker image ls* inside the container and outside
+The output should be the same.
+
+6. Login Jenkins
+http://rhel5:8080
++
+----
+username: admin
+password: Netapp1!
+----
+NOTE: You do not need to reinitialize the Jenkins because it still uses the old volume map *-v ~/jenkins_home:/var/jenkins_home*
+
+== Task 3, Deploy a Docker Container from Jenkins
+
+Because we already installed the docker cli inside the Jenkins Container, we can run *docker* command from Jenkins container directly.
+
+====
+We are going to deploy an AutoSupport Local View Tool, it can decode Auto Support logs locally.
+Details please check here https://hub.docker.com/r/jerry2605/lvt
+====
+
+1. Create a new Task
++
+----
+Item name: run_docker_in_docker
+Project Type: Freestyle Project
+Build: Execute shell
+Command: docker run -d --name lvt -p 80:80 jerry2605/lvt
+----
+image::3_3_1.png[]
+
+2. *Save* and *Build Now*
+
+3. Check the *job* and *Console Output* to make sure it was success
+
+4. Use Web Browser to open follow links, they are ONTAP *AutoSupport* and *EMS log*.
+https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/AutoSupport/EMS-LOG-FILE
++
+https://raw.githubusercontent.com/HaopengL/Automation_DevOps_Using_Jenkins/master/AutoSupport/body.7z
+
+5. Right click the opened page and save to the Windows Jumphost
+
+6. Use Web Browser to open the link, this is the LVT we just deployed.
+http://rhel5:80
++
+image::3_3_2.png[]
+
+7. *Choose File* and Open the two files you just downloaded.
+
+8. Check the AutoSupport items
++
+image::3_3_3.png[]
+
+9. Stop and Delete *LVT* Container
++
+----
+docker stop lvt
+docker rm lvt
+----

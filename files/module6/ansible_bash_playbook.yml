@@ -1,0 +1,9 @@
+---
+- name: list all namespaces
+  hosts: kubernetes
+  become: true
+  user: root
+
+  tasks:
+  - name: get all
+    command: kubectl get all --all-namespaces

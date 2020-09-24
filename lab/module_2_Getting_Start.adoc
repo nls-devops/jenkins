@@ -1,0 +1,241 @@
+= Module 2, Getting Start With Jenkins
+:hardbreaks:
+:nofooter:
+:icons: font
+:linkattrs:
+:imagesdir: ./media/
+:keywords: DevOps, Jenkins, Automation, CI, CD
+
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+
+== Task 1, Deploy a Jenkins Container
+
+On *rhel5*, create a Jenkins Container
+
+1. Log in *rhel5* and create a *Jenkins_home* folder
++
+The folder is for configuration and data for Jenkins. Delete the container will not delete the data.
++
+----
+# mkdir ~/jenkins_home
+----
+
+2. Create a Jenkins Container
++
+----
+docker run -d --name jenkins -p 8080:8080 -u root --restart=always \
+  -v ~/jenkins_home:/var/jenkins_home \
+  jenkins/jenkins:lts-alpine
+----
+
+3. Check the Docker Container is running
++
+----
+# docker ps
+----
+
+4. Find the Jenkins *initialAdminPassword* and copy it, will use it in the next step.
++
+----
+# docker logs -f jenkins
+----
++
+NOTE: it may take several minutes to finish initializing
++
+image::1_1.png[]
+
+5. Use Browser to access
++
+----
+https://rhel5:8080
+----
+
+6. Paste the *initialAdminPassword* and click Continue
++
+image::1_2.png[]
+
+7. Choose *Install suggested plugins*, wait until all finished
++
+image::1_3.png[]
+
+8. Create the First Admin User
++
+----
+Username: admin
+Password: Netapp1!
+Full name: Administrator
+E-mail address: admin@demo.netapp.com
+----
+click *Save and Continue*
+
+9. Use default setting, click *Save and Finish* and *Start using Jenkins*
++
+image::1_4.png[]
+
+
+== Task 2, Install ansicolor and green ball plugin
+
+====
+Ansicolor and Green Ball Plguins are not mandatory, they are for better UX。
+https://plugins.jenkins.io/ansicolor/
+https://plugins.jenkins.io/greenballs/
+====
+
+1. Go to
+Jenkins => Manage Jenkins => Manage Plugins
++
+image::2_1.png[]
+
+2. Click *Available* => Enter *ansicolor* => mark *AnsiColor* => Click *Install without restart*
++
+image::2_2.png[]
+
+3. Waiting all install steps are Success, mark *Restart Jenkins ...*
++
+image::2_3.png[]
+
+4. After restart, login and check if *ansicolor* was installed successfully
+*Jenkins* => *Manage Jenkins* => *Manage Plugins* => *Installed* => search *ansicolor*
++
+image::2_4.png[]
+
+5. Repeat the same procedures to install *Green Balls* plugins
+
+
+== Task 3, Create the First Task
+1. Click *New Item* on Top Left
+
+2. Give an item name, *my_first_job* => *Freestyle project* => *OK*
++
+image::2_3_1.png[]
+
+3. Click *Build* => Click *Add build step* => Click *Execute shell*
++
+image::2_3_2.png[]
+
+4. Write down the shell command
++
+----
+echo "Current date and time is $(date)"
+----
+click *Save*
++
+image::2_3_3.png[]
+
+5. Click *Build Now* on left panel
+
+6. Click the job number on bottom left, for example *1*
++
+image::2_3_4.png[]
+
+7. Click *Console Output* to check the job output
+
+
+== Task 4, Run Bash Script from Jenkins
+1. ssh to *rhel5*
++
+----
+username: root
+password: Netapp1!
+----
+
+2. Go inside the Jenkins Container
++
+----
+# docker exec -it jenkins bash
+----
+
+3. Under /tmp directory, Use *vi* to create a new file *script.sh*
+the content should be
++
+----
+#!/bin/bash
+
+FIRSTNAME=$1
+LASTNAME=$2
+
+echo "Hello, $FIRSTNAME $LASTNAME"
+----
++
+image::2_4_1.png[]
+
+4. Give the execute permission to the new file
++
+----
+chmod +x /tmp/script.sh
+----
+
+5. Go back to Jenkins and create a new task
++
+Item name:: run_script_from_jenkins
+Project Type:: Freestyle project
+Build:: Eecute shell
+
+Command::
+        FirstName="Jane"
+        LastName="Doe"
+        /tmp/script.sh $FirstName $LastName
++
+image::2_4_2.png[]
+
+6. Click *Save* => *Build Now* => click *build umber* => click *Console Output*
++
+image::2_4_3.png[]
+
+== Task 5, Add Parameters
+1. Go back to dashboard => click the task *run_script_from_Jenkins* => click *Configure*
++
+image::2_5_1.png[]
+
+2. *General* => mark *This project is parameterized* => *Add Parameter* => *String Parameter*
+Name:: FristName
+Default Value:: Jane
++
+image::2_5_2.png[]
+
+3. Add another parameter
+Type:: String Parameters
+Name:: LastName
+Default Value:: Doe
+
+4. Modify *Build*
+   Remove::
+    FistName="Jane"
+    LastName="Doe"
+   Only remain::
+   /tmp/script.sh $FristName $Lastname
+
+5. *Save* => *Build with Parameters* => *Build*
+
+6. Check output
+Click *build number* => *Console Output*
++
+image::2_5_3.png[]
+
+== Task 6, Build Periodically
+1. Configure the Task *run_script_from_Jenkins*
+
+2. Click *Build Triggers* => Mark *Build periodically*
+
+3. Google *cron job* to find a cronjob editor, generate a task which runs every minute
++
+----
+* * * * *
+----
+
+4. Copy and paste to Jenkins
++
+image::2_6_1.png[]
+
+5. *Save*, wait several minutes and check if the Jenkins task runs every minute
+
+6. Change *Configure* and unmark the *Build periodically*
++
+image::2_6_2.png[]
